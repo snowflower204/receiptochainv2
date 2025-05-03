@@ -51,6 +51,9 @@ export default function Sidebar() {
         <Link href="/transactions" className="hover:text-yellow-400 flex items-center gap-2">
           {!collapsed && 'Transactions'}
         </Link>
+        <Link href="/receipt" className="hover:text-yellow-400 flex items-center gap-2">
+          {!collapsed && 'Print Receipt'}
+        </Link>
       </nav>
     </aside>
   );
