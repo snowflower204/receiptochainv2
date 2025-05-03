@@ -10,3 +10,11 @@ model Event {
   date        DateTime
   description String
 }
+
+
+model Scan {
+  id         Int      @id @default(autoincrement())
+  scannedId  String
+  status     String   // 'Paid' or 'Unpaid' or 'Not Found'
+  scannedAt  DateTime @default(now())
+}

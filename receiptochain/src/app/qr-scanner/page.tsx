@@ -1,104 +1,111 @@
 'use client';
 
-import React, { useState } from 'react';
-import dynamic from 'next/dynamic';
-import '../globals.css';
-
-// Dynamically import QrScanner with SSR disabled
-const QrScanner = dynamic(() => import('react-qr-scanner'), { ssr: false });
+import React, { useState, useEffect, useRef } from 'react';
+import { BrowserQRCodeReader } from '@zxing/browser';
 
 export default function QRScannerPage() {
-  const [scannedData, setScannedData] = useState('No result yet');
+  const [scannedData, setScannedData] = useState<string | object>('');
   const [paymentStatus, setPaymentStatus] = useState('');
   const [error, setError] = useState('');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const codeReaderRef = useRef<BrowserQRCodeReader | null>(null);
 
-  // Simulated payment check function
-  const checkPaymentStatus = (id: string): string => {
-    const fakeDatabase: { [key: string]: string } = {
-      '12345': 'Paid',
-      '67890': 'No records found',
-    };
-    return fakeDatabase[id] || 'No records found';
-  };
+  useEffect(() => {
+    codeReaderRef.current = new BrowserQRCodeReader();
 
-  // Handle QR scan result
-const handleScan = (data: any) => {
-  if (data && data.text) {
-    try {
-      const scannedId = data.text;
-
-      // Check if the scanned data is a valid JSON string
-      let parsedData;
+    const startScanning = async () => {
       try {
-        parsedData = JSON.parse(scannedId); // Attempt to parse as JSON
-      } catch (error) {
-        parsedData = scannedId; // If it's not JSON, just use the raw text
+        const devices = await BrowserQRCodeReader.listVideoInputDevices();
+        const selectedDeviceId = devices[0]?.deviceId;
+
+        if (!selectedDeviceId) {
+          setError('No camera found');
+          return;
+        }
+
+        if (videoRef.current && codeReaderRef.current) {
+          codeReaderRef.current.decodeFromVideoDevice(
+            selectedDeviceId,
+            videoRef.current,
+            (result, err) => {
+              if (result) {
+                setScannedData(result.getText());
+                checkPaymentStatus(result.getText());
+                setError('');
+              }
+              if (err && !(err.name === 'NotFoundException')) {
+                setError('Error scanning the QR code: ' + err.message);
+              }
+            }
+          );
+        }
+      } catch (err: any) {
+        setError('Error initializing scanner: ' + err.message);
       }
+    };
 
-      setScannedData(parsedData);
-      const status = checkPaymentStatus(parsedData);
-      setPaymentStatus(status);
-      setError('');
+    startScanning();
+
+    return () => {
+      if (codeReaderRef.current) {
+        (codeReaderRef.current as any).reset();
+        codeReaderRef.current = null;
+      }
+    };
+  }, []);
+
+  const checkPaymentStatus = async (scannedId: string) => {
+    try {
+      const res = await fetch('http://localhost:5000/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scannedId }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.scanned) {
+        setPaymentStatus(data.scanned.status);
+        setError('');
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
     } catch (err) {
-      setError('Error processing the QR code. Please try again.');
-      console.error('Error in handleScan:', err);
+      console.error(err);
+      setError('Could not check payment status. Try again.');
     }
-  } else {
-    setError('Invalid QR Code. Please try again.');
-  }
-};
-
-
-  // Handle errors during QR scan
-  const handleError = (err: any) => {
-    setError('Error scanning the QR code. Please try again.');
-    console.error(err);
   };
 
   return (
-    <div className="min-h-screen bg-green-600 flex flex-col items-center justify-center p-6">
-      {/* Display payment status in top right corner */}
-      <div className="absolute top-4 right-4 p-4 bg-white text-green-600 font-semibold rounded-lg shadow-md">
-        {paymentStatus && (
-          <p className="text-sm">
-            {paymentStatus === 'Paid'
-              ? `ID ${scannedData} has already paid.`
-              : `No records found for ID ${scannedData}.`}
-          </p>
-        )}
-      </div>
+    <div className="min-h-screen bg-green-600 flex flex-col items-center justify-center p-6 relative">
+      <div className="w-full max-w-xl bg-white p-6 rounded-2xl shadow-2xl">
+        <h1 className="text-3xl font-bold text-center text-green-700 mb-6">
+          Scan Your Receipt QR Code
+        </h1>
 
-      <div className="w-full max-w-lg bg-white p-6 rounded-xl shadow-lg relative">
-        <h1 className="text-3xl font-bold text-center text-green-600 mb-4">Scan Your Receipt QR Code</h1>
-
-        {/* QR Scanner Component */}
-        <div className="relative mb-6">
-        <QrScanner
-              delay={300}
-             style={{
-               width: '100%',
-               height: 'auto',
-               borderRadius: '8px',
-               border: '2px solid #4CAF50',
-               }}
-               onError={handleError}
-               onScan={handleScan}
-
-          />
-
+        {/* Live camera QR scanner */}
+        <div className="relative w-full h-auto overflow-hidden rounded-xl border-2 border-green-600 mb-6">
+          <video ref={videoRef} className="w-full h-auto rounded-xl" />
         </div>
 
-        {/* Display Scan Result */}
         {scannedData && (
-          <div className="mt-6">
-            <h2 className="text-xl font-semibold text-green-600">Scanned Data:</h2>
-            <p className="text-gray-800 mt-2">{scannedData}</p>
+          <div className="mt-4">
+            <h2 className="text-xl font-semibold text-green-700">Scanned Data:</h2>
+            <pre className="bg-gray-100 text-gray-800 p-3 rounded mt-2 whitespace-pre-wrap">
+              {typeof scannedData === 'object'
+                ? JSON.stringify(scannedData, null, 2)
+                : scannedData}
+            </pre>
           </div>
         )}
 
-        {/* Error Handling */}
+        {paymentStatus && (
+          <div className="mt-4 text-green-700 font-semibold">
+            <p>Payment Status: {paymentStatus}</p>
+          </div>
+        )}
+
         {error && (
-          <div className="mt-4 text-red-500 font-semibold">
+          <div className="mt-4 text-red-600 font-semibold">
             <p>{error}</p>
           </div>
         )}
