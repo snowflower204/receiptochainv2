@@ -1,0 +1,20 @@
+model User {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  date        DateTime
+  description String
+}
+
+
+model Scan {
+  id         Int      @id @default(autoincrement())
+  scannedId  String
+  status     String   // 'Paid' or 'Unpaid' or 'Not Found'
+  scannedAt  DateTime @default(now())
+}
