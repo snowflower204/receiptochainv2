@@ -1,4 +1,4 @@
-import db from '../../lib/db';
+import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 
@@ -6,6 +6,13 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
+
+const dbConfig = {
+  host: 'localhost',
+  user: 'your_username',
+  password: 'your_password',
+  database: 'your_database_name',
+};
 
 export async function POST(req) {
   try {
@@ -23,10 +30,13 @@ export async function POST(req) {
 
     const { email, password } = body;
 
-    const [rows, fields] = await db.query(
+    const connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.execute(
       'SELECT id, email, password FROM user WHERE email = ?',
       [email]
     );
+
+    await connection.end();
 
     if (rows.length === 0) {
       return new Response(JSON.stringify({ message: 'Invalid email or password' }), {
