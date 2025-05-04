@@ -1,13 +1,23 @@
-import db from '../../lib/db';
-import bcrypt from 'bcrypt';
-import { z } from 'zod';
+import mysql from "mysql2/promise";
+import bcrypt from "bcrypt";
+import { z } from "zod";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
 
-export async function POST(req) {
+const dbConfig = {
+  host: "localhost",
+  user: "root",
+  password: "123456789",
+  database: "dbreceipt",
+};
+
+export async function POST(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*"); // Adjust in prod!
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   try {
     const body = await req.json();
 
@@ -15,24 +25,33 @@ export async function POST(req) {
     try {
       loginSchema.parse(body);
     } catch (error) {
-      return new Response(JSON.stringify({ message: 'Invalid email or password format' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ message: "Invalid email or password format" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     const { email, password } = body;
 
-    const [rows, fields] = await db.query(
-      'SELECT id, email, password FROM user WHERE email = ?',
+    const connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.execute(
+      "SELECT id, email, password FROM user WHERE email = ?",
       [email]
     );
 
+    await connection.end();
+
     if (rows.length === 0) {
-      return new Response(JSON.stringify({ message: 'Invalid email or password' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ message: "Invalid email or password" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     const user = rows[0];
@@ -40,26 +59,32 @@ export async function POST(req) {
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
-      return new Response(JSON.stringify({ message: 'Invalid email or password' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ message: "Invalid email or password" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     const { password: hashedPassword, ...userWithoutPassword } = user;
 
     return new Response(
-      JSON.stringify({ message: 'Login successful', user: userWithoutPassword }),
+      JSON.stringify({
+        message: "Login successful",
+        user: userWithoutPassword,
+      }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
       }
     );
   } catch (error) {
-    console.error('Login Error:', error);
-    return new Response(JSON.stringify({ message: 'Internal server error' }), {
+    console.error("Login Error:", error);
+    return new Response(JSON.stringify({ message: "Internal server error" }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   }
 }

@@ -21,7 +21,7 @@ export default function Login() {
     }
 
     try {
-      const res = await fetch('http://localhost:3306/api/login', {
+      const res = await fetch('http://localhost:3000/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId: email, password }), // backend expects studentId
@@ -31,7 +31,7 @@ export default function Login() {
 
       if (res.ok) {
         // Success — redirect to dashboard
-        router.push('/home/dashboard');
+        router.push('/dashboard');
       } else {
         // Error — show error message
         alert(data.message || 'Login failed. Please try again.');
