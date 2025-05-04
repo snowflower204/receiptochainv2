@@ -7,6 +7,8 @@ const loginSchema = z.object({
   password: z.string().min(8),
 });
 
+// Test Commit
+
 const dbConfig = {
   host: 'localhost',
   user: 'your_username',
