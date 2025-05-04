@@ -14,7 +14,12 @@ const dbConfig = {
   database: 'your_database_name',
 };
 
-export async function POST(req) {
+export async function POST(req, res) {
+
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Adjust in prod!
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   try {
     const body = await req.json();
 
